@@ -1,0 +1,17 @@
+{
+  "name": "ENT Personal System",
+  "short_name": "ENT Personal",
+  "description": "A personal system for generating ENT endoscopy reports and CF4 forms.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4f7f6",
+  "theme_color": "#3498db",
+  "icons": [
+    {
+      "src": "image/ent-logo.webp",
+      "sizes": "192x192",
+      "type": "image/webp",
+      "purpose": "any maskable"
+    }
+  ]
+}

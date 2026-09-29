@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign in - ENT Endoscopy System</title>
+    <link rel="icon" href="image/ent-logo.webp">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="./style/index.css">
+    <link rel="stylesheet" href="./style/auth.css">
+</head>
+<body class="ent-login-page">
+    <script>try { if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode'); } catch (e) {}</script>
+
+    <form class="ent-login-card" id="loginForm" autocomplete="on" novalidate>
+        <div class="ent-login-brand">
+            <img src="image/ent-logo.webp" alt="ENT Clinic logo">
+            <h1>ENT Endoscopy System</h1>
+            <p>Sign in with your clinic account</p>
+        </div>
+
+        <div class="ent-login-error" id="loginError" role="alert"></div>
+
+        <div class="ent-field">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" autocomplete="username"
+                   autocapitalize="none" autocorrect="off" spellcheck="false" required>
+        </div>
+
+        <div class="ent-field">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" autocomplete="current-password" required>
+            <div class="ent-hint" id="capsHint" style="display:none;">&#9888; Caps Lock is on</div>
+        </div>
+
+        <!-- Shown only when the account still uses its starter password. -->
+        <div class="ent-field" id="changePwSection" style="display:none;">
+            <label for="newPassword">New password</label>
+            <input type="password" id="newPassword" autocomplete="new-password">
+            <div class="ent-hint">At least 6 characters. This replaces the starter password the admin gave you.</div>
+        </div>
+
+        <div class="ent-field" id="confirmPwSection" style="display:none;">
+            <label for="confirmPassword">Repeat new password</label>
+            <input type="password" id="confirmPassword" autocomplete="new-password">
+        </div>
+
+        <button type="submit" class="ent-login-submit" id="loginBtn">Sign in</button>
+
+        <p class="ent-login-note">
+            Records are separated per doctor &mdash; secretaries only see the patients of
+            the doctor they are assigned to.<br>
+            Forgot your password? Ask the clinic administrator.
+        </p>
+    </form>
+
+    <script src="function/supabaseClient.js"></script>
+    <script src="function/auth.js"></script>
+    <script>
+    (function () {
+        'use strict';
+
+        const form = document.getElementById('loginForm');
+        const btn = document.getElementById('loginBtn');
+        const box = document.getElementById('loginError');
+        const userEl = document.getElementById('username');
+        const passEl = document.getElementById('password');
+        const capsEl = document.getElementById('capsHint');
+        const newPwSection = document.getElementById('changePwSection');
+        const confirmPwSection = document.getElementById('confirmPwSection');
+        const newPwEl = document.getElementById('newPassword');
+        const confirmPwEl = document.getElementById('confirmPassword');
+
+        let changingPassword = false;
+
+        // Only allow a same-folder .html page as the post-login target.
+        function targetPage() {
+            const raw = new URLSearchParams(window.location.search).get('next') || '';
+            const name = decodeURIComponent(raw).split('?')[0].split('/').pop() || '';
+            return /^[a-z0-9_-]+\.html$/i.test(name) ? name : '';
+        }
+
+        function landingPage(user) {
+            const next = targetPage();
+            if (next && next !== 'login.html') return next;
+            return user && user.role === 'admin' ? 'admin.html' : 'index.html';
+        }
+
+        function showError(message) {
+            box.textContent = message;
+            box.classList.add('show');
+        }
+
+        function clearError() { box.classList.remove('show'); }
+
+        // Already signed in? Skip the form entirely.
+        if (window.EntAuth.readSession()) {
+            window.location.replace(landingPage(window.EntAuth.currentUser()));
+        }
+
+        function restoreIdleButton() {
+            btn.type = 'submit';
+            btn.onclick = null;
+            btn.disabled = false;
+            btn.textContent = 'Sign in';
+        }
+
+        // The account still uses the password the admin created it with:
+        // ask for a new one before letting the user in.
+        function enterChangePasswordMode(message) {
+            changingPassword = true;
+            passEl.readOnly = true;
+            newPwSection.style.display = 'block';
+            confirmPwSection.style.display = 'block';
+            btn.textContent = 'Save new password & sign in';
+            showError(message);
+            newPwEl.focus();
+        }
+
+        function exitChangePasswordMode() {
+            changingPassword = false;
+            passEl.readOnly = false;
+            newPwSection.style.display = 'none';
+            confirmPwSection.style.display = 'none';
+            newPwEl.value = '';
+            confirmPwEl.value = '';
+            restoreIdleButton();
+        }
+
+        async function finishSignIn(username, password) {
+            btn.disabled = true;
+            btn.textContent = 'Signing in\u2026';
+            try {
+                const result = await window.EntAuth.login(username, password);
+                if (!result.success) {
+                    if (result.mustChangePassword) {
+                        restoreIdleButton();
+                        enterChangePasswordMode(result.error);
+                        return;
+                    }
+                    showError(result.error || 'Sign in failed.');
+                    restoreIdleButton();
+                    passEl.focus();
+                    passEl.select();
+                    return;
+                }
+                if (result.offline) {
+                    showError('Signed in from this device\u2019s saved credentials (no internet). Cloud sync is paused.');
+                    btn.type = 'button';
+                    btn.disabled = false;
+                    btn.textContent = 'Continue anyway';
+                    btn.onclick = function () { window.location.href = landingPage(result.user); };
+                    return;
+                }
+                window.location.href = landingPage(result.user);
+            } catch (error) {
+                showError(error.message || 'Sign in failed.');
+                restoreIdleButton();
+            }
+        }
+
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            clearError();
+            const username = userEl.value;
+
+            // Second step of a forced password change: store it, then sign in with it.
+            if (changingPassword) {
+                if (newPwEl.value.length < 6) {
+                    showError('The new password must be at least 6 characters.');
+                    restoreIdleButton();
+                    newPwEl.focus();
+                    return;
+                }
+                if (newPwEl.value !== confirmPwEl.value) {
+                    showError('The two new passwords do not match.');
+                    restoreIdleButton();
+                    confirmPwEl.focus();
+                    return;
+                }
+                btn.disabled = true;
+                btn.textContent = 'Saving...';
+                const change = await window.EntAuth.setPassword(username, newPwEl.value, passEl.value);
+                if (!change.success) {
+                    showError(change.error || 'The password could not be changed.');
+                    restoreIdleButton();
+                    newPwEl.focus();
+                    return;
+                }
+                passEl.value = newPwEl.value;
+                exitChangePasswordMode();
+                clearError();
+                showError('Password updated. Signing you in...');
+            }
+
+            await finishSignIn(username, passEl.value);
+        });
+
+        function checkCaps(event) {
+            const supported = typeof event.getModifierState === 'function';
+            capsEl.style.display = supported && event.getModifierState('CapsLock') ? 'block' : 'none';
+        }
+        passEl.addEventListener('keyup', checkCaps);
+        passEl.addEventListener('keydown', checkCaps);
+        passEl.addEventListener('blur', function () { capsEl.style.display = 'none'; });
+
+        // If Supabase was never configured, say so up front instead of
+        // showing "unknown username" for every attempt.
+        if (window.EntSupabase && !window.EntSupabase.isConfigured()) {
+            showError('Supabase is not configured yet. Open settings on the clinic machine, or sign in while offline with a saved account.');
+        }
+
+        userEl.focus();
+    })();
+    </script>
+</body>
+</html>

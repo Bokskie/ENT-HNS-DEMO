@@ -1,0 +1,7 @@
+HARNESS ERROR page.evaluate: TypeError: Cannot read properties of null (reading 'display')
+    at eval (eval at evaluate (:311:30), <anonymous>:15:38)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+    at C:\Users\REVER MEDICAL CENTER\Documents\ENT-HNS_ENDOSCOPY-REPORT-main\scripts\test_header_v28c_pw.js:22:28 {
+  log: []
+}

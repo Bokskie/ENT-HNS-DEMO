@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Console - ENT Endoscopy System</title>
+    <link rel="icon" href="image/ent-logo.webp">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="./style/index.css">
+    <link rel="stylesheet" href="./style/auth.css">
+</head>
+<body class="ent-admin-page">
+    <div class="header">
+        <div class="header-content">
+            <h1>&#9881; Admin Console</h1>
+            <div class="theme-switch-wrapper">
+                <a class="ent-btn" href="index.html" style="text-decoration:none;">&larr; Back to app</a>
+            </div>
+        </div>
+    </div>
+
+    <main class="ent-admin-main">
+        <div class="ent-admin-tabs" id="adminTabs">
+            <button type="button" data-panel="overview" class="active">Overview</button>
+            <button type="button" data-panel="users">Users</button>
+            <button type="button" data-panel="sessions">Active sessions</button>
+            <button type="button" data-panel="activity">Activity log</button>
+            <span class="ent-live-refresh" id="lastRefresh" style="margin-left:auto;align-self:center;"></span>
+        </div>
+
+        <!-- ---------------------------- OVERVIEW --------------------------- -->
+        <section class="ent-admin-panel active" id="panel-overview">
+            <div class="ent-stat-grid">
+                <div class="ent-stat"><div class="ent-stat-value" id="statActive">-</div><div class="ent-stat-label">Active now</div></div>
+                <div class="ent-stat"><div class="ent-stat-value" id="statUsers">-</div><div class="ent-stat-label">Total users</div></div>
+                <div class="ent-stat ok"><div class="ent-stat-value" id="statDoctors">-</div><div class="ent-stat-label">Doctors</div></div>
+                <div class="ent-stat warn"><div class="ent-stat-value" id="statSecretaries">-</div><div class="ent-stat-label">Secretaries</div></div>
+                <div class="ent-stat danger"><div class="ent-stat-value" id="statInactive">-</div><div class="ent-stat-label">Deactivated</div></div>
+                <div class="ent-stat"><div class="ent-stat-value" id="statLogins">-</div><div class="ent-stat-label">Logins today</div></div>
+            </div>
+            <h3 style="font-size:.95rem;margin:0 0 8px;">Live sessions</h3>
+            <div class="ent-table-wrap">
+                <table class="ent-table">
+                    <thead><tr><th>Who</th><th>Role</th><th>Device</th><th>Seen</th><th>Status</th></tr></thead>
+                    <tbody id="overviewSessions"><tr><td colspan="5" class="ent-empty">Loading&hellip;</td></tr></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ------------------------------ USERS ---------------------------- -->
+        <section class="ent-admin-panel" id="panel-users">
+            <div class="ent-admin-toolbar">
+                <input type="search" id="userSearch" placeholder="Search name or username&hellip;">
+                <select id="roleFilter">
+                    <option value="">All roles</option>
+                    <option value="admin">Admin</option>
+                    <option value="doctor">Doctor</option>
+                    <option value="secretary">Secretary</option>
+                </select>
+                <span class="spacer"></span>
+                <button type="button" class="ent-btn" id="refreshUsersBtn">&#8635; Refresh</button>
+                <button type="button" class="ent-btn primary" id="addUserBtn">+ Add user</button>
+            </div>
+            <div class="ent-table-wrap">
+                <table class="ent-table">
+                    <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Assigned doctor</th><th>Last login</th><th>Status</th><th></th></tr></thead>
+                    <tbody id="usersTable"><tr><td colspan="7" class="ent-empty">Loading&hellip;</td></tr></tbody>
+                </table>
+            </div>
+            <p class="ent-hint">Secretaries can only open the patients of their assigned doctor. Deactivating a user blocks the next sign-in and revokes that user&rsquo;s open sessions.</p>
+        </section>
+
+        <!-- ---------------------------- SESSIONS --------------------------- -->
+        <section class="ent-admin-panel" id="panel-sessions">
+            <div class="ent-admin-toolbar">
+                <label class="ent-hint" style="font-size:.85rem;"><input type="checkbox" id="liveChk" checked style="width:auto;"> Auto-refresh every 15&nbsp;s</label>
+                <span class="spacer"></span>
+                <button type="button" class="ent-btn" id="refreshSessionsBtn">&#8635; Refresh</button>
+            </div>
+            <div class="ent-table-wrap">
+                <table class="ent-table">
+                    <thead><tr><th>Who</th><th>Role</th><th>Device</th><th>Signed in</th><th>Last seen</th><th>Status</th><th></th></tr></thead>
+                    <tbody id="sessionsTable"><tr><td colspan="7" class="ent-empty">Loading&hellip;</td></tr></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ---------------------------- ACTIVITY --------------------------- -->
+        <section class="ent-admin-panel" id="panel-activity">
+            <div class="ent-admin-toolbar">
+                <select id="activityFilter">
+                    <option value="">All actions</option>
+                    <option value="LOGIN">Login</option>
+                    <option value="LOGOUT">Logout</option>
+                    <option value="SAVE_RECORD">Record saved</option>
+                    <option value="OPEN_RECORD">Record opened</option>
+                    <option value="USER_CREATED">User created</option>
+                    <option value="USER_UPDATED">User updated</option>
+                    <option value="USER_ACTIVATED">User activated</option>
+                    <option value="USER_DEACTIVATED">User deactivated</option>
+                    <option value="PASSWORD_RESET">Password reset</option>
+                    <option value="SESSION_REVOKED">Session revoked</option>
+                </select>
+                <span class="spacer"></span>
+                <button type="button" class="ent-btn" id="refreshActivityBtn">&#8635; Refresh</button>
+            </div>
+            <div class="ent-table-wrap">
+                <table class="ent-table">
+                    <thead><tr><th>When</th><th>Who</th><th>Role</th><th>Action</th><th>Detail</th></tr></thead>
+                    <tbody id="activityTable"><tr><td colspan="5" class="ent-empty">Loading&hellip;</td></tr></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- ------------------------- ADD / EDIT USER -------------------------- -->
+    <div class="ent-modal" id="userModal" role="dialog" aria-modal="true">
+        <div class="ent-modal-card">
+            <h3 id="userModalTitle">Add user</h3>
+            <div class="ent-field">
+                <label for="fFullName">Full name</label>
+                <input type="text" id="fFullName" autocomplete="off">
+            </div>
+            <div class="ent-field">
+                <label for="fUsername">Username</label>
+                <input type="text" id="fUsername" autocomplete="off" autocapitalize="none" spellcheck="false">
+                <div class="ent-hint">Lowercase, no spaces. This is what they type to sign in.</div>
+            </div>
+            <div class="ent-field">
+                <label for="fRole">Role</label>
+                <select id="fRole">
+                    <option value="doctor">Doctor &mdash; sees only own patients</option>
+                    <option value="secretary">Secretary &mdash; sees the assigned doctor&rsquo;s patients</option>
+                    <option value="admin">Admin &mdash; sees everything</option>
+                </select>
+            </div>
+            <div class="ent-field" id="assignedWrap" style="display:none;">
+                <label for="fAssigned">Assigned doctor</label>
+                <select id="fAssigned"></select>
+                <div class="ent-hint">This secretary can only open that doctor&rsquo;s records.</div>
+            </div>
+            <div class="ent-field">
+                <label for="fSpecialty">Specialty / notes (optional)</label>
+                <input type="text" id="fSpecialty" autocomplete="off">
+            </div>
+            <div class="ent-field">
+                <label for="fPassword" id="passwordLabel">Password</label>
+                <input type="password" id="fPassword" autocomplete="new-password">
+                <div class="ent-hint" id="passwordHint">At least 6 characters.</div>
+            </div>
+            <div class="ent-field">
+                <label class="ent-hint" style="display:flex;align-items:center;gap:7px;font-size:.85rem;">
+                    <input type="checkbox" id="fActive" checked style="width:auto;"> Account is active
+                </label>
+            </div>
+            <div class="ent-login-error" id="userModalError"></div>
+            <div class="ent-modal-actions">
+                <button type="button" class="ent-btn" id="userModalCancel">Cancel</button>
+                <button type="button" class="ent-btn primary" id="userModalSave">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="function/supabaseClient.js" defer></script>
+    <script src="function/auth.js" defer></script>
+    <script src="function/admin.js" defer></script>
+</body>
+</html>

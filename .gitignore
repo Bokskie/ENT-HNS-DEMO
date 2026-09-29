@@ -1,0 +1,34 @@
+# ============================================
+# OS / Editor files
+# ============================================
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+.idea/
+.vscode/
+*.suo
+*.user
+
+# ============================================
+# Temp / scratch files
+# ============================================
+*_temp.*
+temp/
+tmp/
+*.log
+*_bracecheck.*
+*_parencheck.*
+
+# ============================================
+# Development scratch scripts
+# ============================================
+fix_orphaned.py
+fix_orphaned.ps1
+
+# ============================================
+# Personal / private files (never commit)
+# ============================================
+*.pptx
+*.docx
+*.xlsx

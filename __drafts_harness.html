@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Drafts Browser Test Harness</title>
+</head>
+<body>
+    <button type="button" id="localDraftsBtn">My Drafts</button>
+    <pre id="results">RUNNING</pre>
+    <script>
+        // Stub bridge for the drafts module (mimics index.js on the nasal page).
+        window.__errors = [];
+        window.addEventListener('error', (e) => {
+            window.__errors.push((e.message || String(e)) + ' @' + (e.filename || '') + ':' + (e.lineno || ''));
+        });
+        window.EntFormBridge = {
+            reportType: 'nasal',
+            getData: () => ({}),
+            restore: (data) => { window.__restored = data; },
+            alert: (msg, title) => { window.__lastAlert = title + ' | ' + msg; }
+        };
+        try { localStorage.removeItem('entSavedDraftsV1'); } catch (e) {}
+    </script>
+    <script src="function/draftsBrowser.js"></script>
+    <script>
+        (async function () {
+            const results = [];
+            const assert = (cond, msg) => results.push((cond ? 'PASS: ' : 'FAIL: ') + msg);
+            try {
+                assert(window.EntDrafts && typeof window.EntDrafts.saveAndOpen === 'function', 'EntDrafts exported');
+
+                // --- Save Draft (save + popup opens) ---
+                const d1 = window.EntDrafts.saveAndOpen('nasal', {
+                    patientLastName: 'Dela Cruz', patientFirstName: 'Juan', patientPin: 'PIN123',
+                    procedureDate: '2026-09-28', images: ['data:image/jpeg;base64,AAAA']
+                }, 'Dela_Cruz, Juan_Nasal_Data.json');
+                assert(d1 && d1.patientName === 'Dela Cruz, Juan', 'meta built: ' + (d1 && d1.patientName));
+                assert(d1 && d1.patientId === 'PIN123', 'patientId built: ' + (d1 && d1.patientId));
+                const modal = document.getElementById('localDraftsModal');
+                assert(modal, 'modal created');
+                assert(modal && modal.classList.contains('is-open'), 'popup opened after save');
+                assert(window.EntDrafts.readDrafts().length === 1, '1 draft stored locally');
+                assert((localStorage.getItem('entSavedDraftsV1') || '').includes('Dela Cruz'), 'draft persisted in localStorage');
+                const statusEl = document.querySelector('.ent-drafts-status');
+                assert(statusEl && !statusEl.hidden, 'status line shows saved message');
+                assert(document.querySelector('.ent-drafts-card-name').textContent === 'Dela Cruz, Juan', 'card shows patient name');
+
+                // --- Dedupe on repeated Save Draft for same patient/date ---
+                window.EntDrafts.saveDraft('nasal', { patientLastName: 'Dela Cruz', patientFirstName: 'Juan', procedureDate: '2026-09-28' }, 'x.json');
+                assert(window.EntDrafts.readDrafts().length === 1, 'same patient+date deduped');
+
+                // --- More drafts incl. other report type ---
+                window.EntDrafts.saveDraft('nasal', { patientLastName: 'Reyes', patientFirstName: 'Ana', procedureDate: '2026-09-29' }, 'reyes.json');
+                window.EntDrafts.saveDraft('cf4', { patientLastName: 'Cruz', patientFirstName: 'Pedro' }, 'cf4.json');
+                assert(window.EntDrafts.readDrafts().length === 3, '3 drafts stored');
+
+                window.EntDrafts.openModal();
+                let cards = document.querySelectorAll('.ent-drafts-card');
+                assert(cards.length === 3, '3 cards rendered (got ' + cards.length + ')');
+
+                // --- Cross-type guard (like dbRecords) ---
+                let cf4OpenBtn = null, nasalOpenBtn = null;
+                cards.forEach(c => {
+                    const b = c.querySelector('.ent-drafts-open');
+                    const name = c.querySelector('.ent-drafts-card-name').textContent;
+                    if (c.textContent.includes('CF4')) cf4OpenBtn = b;
+                    if (name === 'Dela Cruz, Juan') nasalOpenBtn = b;
+                });
+                assert(cf4OpenBtn && cf4OpenBtn.disabled, 'Open disabled for CF4 draft on nasal page');
+                assert(nasalOpenBtn && !nasalOpenBtn.disabled, 'Open enabled for nasal draft');
+
+                // --- Download JSON button ---
+                const dlBtn = document.querySelector('.ent-drafts-download');
+                dlBtn.click();
+                assert((document.querySelector('.ent-drafts-status').textContent || '').includes('Downloaded'), 'download button produced status');
+
+                // --- Open flow with confirm dialog ---
+                nasalOpenBtn.click();
+                await new Promise(r => setTimeout(r, 50));
+                assert(document.querySelector('.ent-drafts-confirm') !== null, 'confirm dialog before restoring');
+                document.querySelector('.ent-drafts-confirm-yes').click();
+                await new Promise(r => setTimeout(r, 50));
+                assert(window.__restored && window.__restored.patientLastName === 'Dela Cruz', 'bridge.restore received formData');
+                assert(!document.getElementById('localDraftsModal').classList.contains('is-open'), 'popup closed after opening draft');
+
+                // --- Search filter ---
+                window.EntDrafts.openModal();
+                const search = document.querySelector('.ent-drafts-search');
+                search.value = 'reyes';
+                search.dispatchEvent(new Event('input'));
+                assert(document.querySelectorAll('.ent-drafts-card').length === 1, 'search narrows to 1 card');
+                search.value = 'nomatchxyz';
+                search.dispatchEvent(new Event('input'));
+                assert(document.querySelector('.ent-drafts-empty') !== null, 'empty state on no match');
+                search.value = '';
+                search.dispatchEvent(new Event('input'));
+
+                // --- Delete flow ---
+                document.querySelectorAll('.ent-drafts-delete')[0].click();
+                await new Promise(r => setTimeout(r, 50));
+                document.querySelector('.ent-drafts-confirm-yes').click();
+                await new Promise(r => setTimeout(r, 50));
+                assert(window.EntDrafts.readDrafts().length === 2, 'delete removes draft (got ' + window.EntDrafts.readDrafts().length + ')');
+
+                // --- Button binding ---
+                assert(document.getElementById('localDraftsBtn').dataset.draftsBound === 'true', 'My Drafts button bound');
+
+                assert(window.__errors.length === 0, 'no runtime errors' + (window.__errors.length ? ': ' + window.__errors.join(' ; ') : ''));
+            } catch (err) {
+                results.push('FAIL: exception: ' + err.message);
+                results.push(String(err.stack || ''));
+            }
+            document.getElementById('results').textContent = 'HARNESS_DONE\n' + results.join('\n');
+        })();
+
+    </script>
+</body>
+</html>
